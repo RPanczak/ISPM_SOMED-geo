@@ -1,8 +1,8 @@
 ---
-title: "COVID-SEP project"
-subtitle: "Geocoding COVID data"
+title: "SOMED-geo project"
+subtitle: "Geocoding SOMED data"
 description: |
-  Testing providers with mock data.
+  Geocoding BAG data using two providers.
 date: "`r Sys.Date()`"
 author:
   - name: Radoslaw Panczak 
@@ -21,7 +21,6 @@ editor_options:
   chunk_output_type: console
 ---
 
-<!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
 
 ```{r setup, include=FALSE}
