@@ -216,4 +216,113 @@ fail_geoadmin <- bag_addresses_street %>%
 
 `r number(nrow(fail_geoadmin), big.mark = ",")` addresses failed to be geocoded despite having addres and will be attempted with next method. 
 
+# Google
+
+## Info
+
+Working via `ggmap` [package](https://github.com/dkahle/ggmap). 
+It requires [API sign up](https://cran.r-project.org/web/packages/ggmap/readme/README.html) 
+
+<aside>
+... so please be careful with reruns of large batches of data!
+</aside>
+
+```{r google-auth, eval=FALSE, include=FALSE}
+p_load(ggmap)
+
+key_google <- readr::read_file("secrets/api_google.txt")
+register_google(key = key_google)
+```
+
+## Addresses with incomplete info 
+
+```{r}
+bag_addresses_no_street <- bag_somed_2018 %>% 
+  select(link:ort) %>% 
+  filter(is.na(strasse) | link %in% problems) %>% 
+  mutate(strasse = ifelse(institution == "ALTERS- & PFLEGEHEIM ST. ANTONIUS",
+                          "Innere Saastalstrasse 107", strasse)) %>% 
+  mutate(strasse = ifelse(institution == "ALTERS- & PFLEGEHEIM SUNNUSCHII",
+                          "Dorf Guttet 13", strasse)) %>%   
+  mutate(strasse = ifelse(institution == "BETAGTENZENTRUM ÄTTENBÜHL", 
+                          "Aettenbühl 2", strasse)) %>% 
+  mutate(strasse = ifelse(institution == "ALTERS- & PFLEGEHEIM RÜTTIHUBELBAD", 
+                          "Rüttihubel 29", strasse)) %>% 
+  mutate(address_orig = if_else(!is.na(strasse),
+                                paste(institution, strasse, ort, sep = ", "),
+                                paste(institution, ort, sep = ", "))) %>% 
+  mutate(address_orig = paste(address_orig, "Switzerland", sep = ", "))
+```
+
+Attempting to rescue `r number(nrow(bag_addresses_no_street), big.mark = ",")` addresses with various missing parts of address, mostly street name.
+
+```{r google-proc, eval=FALSE, include=FALSE}
+# geocode, reproject to CH1903 / LV03, extract both coords to cols
+results_google <- bag_addresses_no_street %>% 
+  mutate_geocode(address_orig, output = "more", ext = "ch") %>% 
+  rename(address_google = address) %>% 
+  select(-north, -south , -east, -west) 
+
+# manual corrections
+results_google %<>% 
+  mutate(source = "google") %>% 
+  rename(address_geocoder = address_google) %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM ST. ANTONIUS", 
+                      7.93577374581253, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM ST. ANTONIUS", 
+                      46.13062054756855, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM ST. ANTONIUS", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM RÜTTIHUBELBAD", 
+                      7.59856495803135, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM RÜTTIHUBELBAD", 
+                      46.939927400209825, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM RÜTTIHUBELBAD", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM FLÄCKEMATTE", 
+                      8.266983206768096, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM FLÄCKEMATTE", 
+                      47.09349358397919, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM FLÄCKEMATTE", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM EMSERBERG", 
+                      7.6933695477414235, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM EMSERBERG", 
+                      46.29313254652122, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM EMSERBERG", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM SERNFTAL", 
+                      9.167769400562054, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM SERNFTAL", 
+                      46.91622103311342, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM SERNFTAL", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM SUNNUSCHII", 
+                      7.6668983196833365, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM SUNNUSCHII", 
+                      46.32432057290535, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM SUNNUSCHII", 
+                         "manual", source))
+
+write_rds(results_google, "data/geocoding/results_google.Rds")
+```
+
+```{r}
+read_rds(results_google, "data/geocoding/results_google.Rds")
+
+results_google_clean <- results_google %>% 
+  st_as_sf(coords = c("lon", "lat"), remove = FALSE,
+           crs = 4326, 
+           agr = "identity") %>%  
+  st_transform(crs = 2056) %>% 
+  dplyr::mutate(geoy = sf::st_coordinates(.)[,1],
+                geox = sf::st_coordinates(.)[,2]) %>% 
+  st_drop_geometry() %>% 
+  select(link, address_geocoder, geoy, geox, source)
+
+rm(bag_addresses_no_street, results_google)
+```
+
+Rescued `r number(nrow(filter(results_google_clean, source == "manual")), big.mark = ",")` addresses with manual searches.
+
 
