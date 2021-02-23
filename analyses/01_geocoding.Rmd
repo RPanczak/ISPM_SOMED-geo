@@ -490,6 +490,8 @@ bag_addresses_clean_geo <- bag_addresses_clean %>%
            crs = 2056, 
            agr = "identity") 
 
+write_rds(bag_addresses_clean_geo, "data/geocoding/bag_addresses_clean_geo.Rds")
+
 qtm(bag_addresses_clean_geo)
 ```
 
