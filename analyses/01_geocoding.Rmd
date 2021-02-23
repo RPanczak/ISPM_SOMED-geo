@@ -199,11 +199,19 @@ results_geoadmin_clean <- results_geoadmin %>%
   filter(!link %in% problems) %>% 
   group_by(link) %>% 
   filter(group_order == 1) %>% 
+  ungroup() %>% 
   select(link, attrs_detail, attrs_y, attrs_x) %>% 
-  rename(address_geocoder = attrs_detail,
-         geoy = attrs_y, geox = attrs_x) %>% 
-  mutate(source = "geoadmin")
-
+  rename(address_geocoder = attrs_detail) %>% 
+  mutate(source = "geoadmin") %>% 
+  st_as_sf(coords = c("attrs_y", "attrs_x"), remove = TRUE,
+           crs = 21781, 
+           agr = "identity") %>%  
+  st_transform(crs = 2056) %>% 
+  dplyr::mutate(geoy = sf::st_coordinates(.)[,1],
+                geox = sf::st_coordinates(.)[,2]) %>% 
+  st_drop_geometry() %>% 
+  select(link, address_geocoder, geoy, geox, source)
+  
 rm(results_geoadmin)
 ```
 
@@ -326,14 +334,6 @@ Rescued `r number(nrow(results_google_1_clean), big.mark = ",")` addresses with 
 
 ```{r}
 fail_geoadmin <- fail_geoadmin %>% 
-  # mutate(strasse = ifelse(institution == "ALTERS- & PFLEGEHEIM ST. ANTONIUS",
-  #                         "Innere Saastalstrasse 107", strasse)) %>% 
-  # mutate(strasse = ifelse(institution == "ALTERS- & PFLEGEHEIM SUNNUSCHII",
-  #                         "Dorf Guttet 13", strasse)) %>%   
-  # mutate(strasse = ifelse(institution == "BETAGTENZENTRUM ÄTTENBÜHL", 
-  #                         "Aettenbühl 2", strasse)) %>% 
-  # mutate(strasse = ifelse(institution == "ALTERS- & PFLEGEHEIM RÜTTIHUBELBAD", 
-  #                         "Rüttihubel 29", strasse)) %>% 
   mutate(address_orig = if_else(!is.na(strasse),
                                 paste(institution, strasse, ort, sep = ", "),
                                 paste(institution, ort, sep = ", "))) %>% 
@@ -463,4 +463,33 @@ rm(results_google_2)
 ```
 
 Rescued `r number(nrow(results_google_2_clean), big.mark = ",")` addresses with Google and manual searches.
+
+# Combined results
+
+```{r}
+bag_addresses_clean <- bag_somed_2018 %>% 
+  select(link:kanton) %>% 
+  left_join(bind_rows(results_geoadmin_clean, 
+                      results_google_1_clean,
+                      results_google_2_clean), 
+            by = "link")
+
+write_rds(bag_addresses_clean, "data/geocoding/bag_addresses_clean.Rds")
+```
+
+Source of address:
+
+```{r}
+sjmisc::frq(bag_addresses_clean, source)
+```
+
+```{r}
+bag_addresses_clean_geo <- bag_addresses_clean %>% 
+  select(-address_geocoder) %>% 
+    st_as_sf(coords = c("geoy", "geox"), remove = TRUE,
+           crs = 2056, 
+           agr = "identity") 
+
+qtm(bag_addresses_clean_geo)
+```
 
