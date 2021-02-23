@@ -254,17 +254,14 @@ bag_addresses_no_street <- bag_somed_2018 %>%
   mutate(address_orig = paste(address_orig, "Switzerland", sep = ", "))
 ```
 
-Attempting to rescue `r number(nrow(bag_addresses_no_street), big.mark = ",")` addresses with various missing parts of address, mostly street name.
-
-```{r google-proc, eval=FALSE, include=FALSE}
-# geocode, reproject to CH1903 / LV03, extract both coords to cols
-results_google <- bag_addresses_no_street %>% 
+```{r google-proc-1, eval=FALSE, include=FALSE}
+results_google_1 <- bag_addresses_no_street %>% 
   mutate_geocode(address_orig, output = "more", ext = "ch") %>% 
   rename(address_google = address) %>% 
   select(-north, -south , -east, -west) 
 
 # manual corrections
-results_google %<>% 
+results_google_1 %<>% 
   mutate(source = "google") %>% 
   rename(address_geocoder = address_google) %>% 
   mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM ST. ANTONIUS", 
@@ -304,13 +301,13 @@ results_google %<>%
   mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM SUNNUSCHII", 
                          "manual", source))
 
-write_rds(results_google, "data/geocoding/results_google.Rds")
+write_rds(results_google_1, "data/geocoding/results_google_1.Rds")
 ```
 
 ```{r}
-read_rds(results_google, "data/geocoding/results_google.Rds")
+results_google_1 <- read_rds("data/geocoding/results_google_1.Rds")
 
-results_google_clean <- results_google %>% 
+results_google_1_clean <- results_google_1 %>% 
   st_as_sf(coords = c("lon", "lat"), remove = FALSE,
            crs = 4326, 
            agr = "identity") %>%  
@@ -320,9 +317,150 @@ results_google_clean <- results_google %>%
   st_drop_geometry() %>% 
   select(link, address_geocoder, geoy, geox, source)
 
-rm(bag_addresses_no_street, results_google)
+rm(bag_addresses_no_street, results_google_1)
 ```
 
-Rescued `r number(nrow(filter(results_google_clean, source == "manual")), big.mark = ",")` addresses with manual searches.
+Rescued `r number(nrow(results_google_1_clean), big.mark = ",")` addresses with Google and manual searches.
 
+## Addresses that failed on geoadmin 
+
+```{r}
+fail_geoadmin <- fail_geoadmin %>% 
+  # mutate(strasse = ifelse(institution == "ALTERS- & PFLEGEHEIM ST. ANTONIUS",
+  #                         "Innere Saastalstrasse 107", strasse)) %>% 
+  # mutate(strasse = ifelse(institution == "ALTERS- & PFLEGEHEIM SUNNUSCHII",
+  #                         "Dorf Guttet 13", strasse)) %>%   
+  # mutate(strasse = ifelse(institution == "BETAGTENZENTRUM ÄTTENBÜHL", 
+  #                         "Aettenbühl 2", strasse)) %>% 
+  # mutate(strasse = ifelse(institution == "ALTERS- & PFLEGEHEIM RÜTTIHUBELBAD", 
+  #                         "Rüttihubel 29", strasse)) %>% 
+  mutate(address_orig = if_else(!is.na(strasse),
+                                paste(institution, strasse, ort, sep = ", "),
+                                paste(institution, ort, sep = ", "))) %>% 
+  mutate(address_orig = paste(address_orig, "Switzerland", sep = ", "))
+```
+
+```{r google-proc-2, eval=FALSE, include=FALSE}
+results_google_2 <- fail_geoadmin %>% 
+  mutate_geocode(address_orig, output = "more", ext = "ch") %>% 
+  rename(address_google = address) %>% 
+  select(-north, -south , -east, -west) 
+
+# manual corrections
+results_google_2 %<>% 
+  mutate(source = "google") %>% 
+  rename(address_geocoder = address_google) %>% 
+  filter(institution != "ALTERS- & PFLEGEHEIM SERNFTAL") %>% 
+  filter(institution != "ALTERS- & PFLEGEHEIM FLÄCKEMATTE") %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM WATT", 
+                      9.582466313067224, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM WATT", 
+                      47.4144862709438, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM WATT", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM RIALTO", 
+                      7.7777586972448445, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM RIALTO", 
+                      46.654695076007975, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM RIALTO", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM BEATENBERG / HABKERN", 
+                      7.769634550007978, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM BEATENBERG / HABKERN", 
+                      46.68954218100697, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM BEATENBERG / HABKERN", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM REDERNWEG", 
+                      7.261368447028669, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM REDERNWEG", 
+                      47.150472404213765, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM REDERNWEG", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM CRISTAL", 
+                      7.257562701870954, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM CRISTAL", 
+                      47.12581256358591, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM CRISTAL", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM SCHÜSSPARK", 
+                      7.252053303013286, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM SCHÜSSPARK", 
+                      47.136858230166084, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM SCHÜSSPARK", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM ST. MARTIN", 
+                      9.434010532933275, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM ST. MARTIN", 
+                      46.72050458294954, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM ST. MARTIN", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM DOMLESCHG", 
+                      9.452284367076437, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM DOMLESCHG", 
+                      46.713135982154, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM DOMLESCHG", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM HOF RIEDERN", 
+                      9.422052147210081, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM HOF RIEDERN", 
+                      47.451205483216135, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM HOF RIEDERN", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM FAHR", 
+                      9.632826238315563, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM FAHR", 
+                      47.45052870926944, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM FAHR", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM SCHÖNAU", 
+                      9.018586131841646, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM SCHÖNAU", 
+                      47.21749804388581, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM SCHÖNAU", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "ALTERS- & PFLEGEHEIM ALTERSHAAMET WILCHINGEN", 
+                      8.467918273040045, lon)) %>% 
+  mutate(lat = ifelse(institution == "ALTERS- & PFLEGEHEIM ALTERSHAAMET WILCHINGEN", 
+                      47.66988951431913, lat)) %>% 
+  mutate(source = ifelse(institution == "ALTERS- & PFLEGEHEIM ALTERSHAAMET WILCHINGEN", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "WOHN- & PFLEGEHEIM FRIENISBERG", 
+                      7.331735539392691, lon)) %>% 
+  mutate(lat = ifelse(institution == "WOHN- & PFLEGEHEIM FRIENISBERG", 
+                      47.02691448966767, lat)) %>% 
+  mutate(source = ifelse(institution == "WOHN- & PFLEGEHEIM FRIENISBERG", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "WOHN- & PFLEGEHEIM SONNMATT AG", 
+                      8.466771200534138, lon)) %>% 
+  mutate(lat = ifelse(institution == "WOHN- & PFLEGEHEIM SONNMATT AG", 
+                      47.67179239401392, lat)) %>% 
+  mutate(source = ifelse(institution == "WOHN- & PFLEGEHEIM SONNMATT AG", 
+                         "manual", source)) %>% 
+  mutate(lon = ifelse(institution == "HAUS ZUM SEEWADEL", 
+                      8.446460975440216, lon)) %>% 
+  mutate(lat = ifelse(institution == "HAUS ZUM SEEWADEL", 
+                      47.2780911901289, lat)) %>% 
+  mutate(source = ifelse(institution == "HAUS ZUM SEEWADEL", 
+                         "manual", source)) 
+
+write_rds(results_google_2, "data/geocoding/results_google_2.Rds")
+```
+
+```{r}
+results_google_2 <- read_rds("data/geocoding/results_google_2.Rds")
+
+results_google_2_clean <- results_google_2 %>% 
+  st_as_sf(coords = c("lon", "lat"), remove = FALSE,
+           crs = 4326, 
+           agr = "identity") %>%  
+  st_transform(crs = 2056) %>% 
+  dplyr::mutate(geoy = sf::st_coordinates(.)[,1],
+                geox = sf::st_coordinates(.)[,2]) %>% 
+  st_drop_geometry() %>% 
+  select(link, address_geocoder, geoy, geox, source)
+
+rm(results_google_2)
+```
+
+Rescued `r number(nrow(results_google_2_clean), big.mark = ",")` addresses with Google and manual searches.
 
