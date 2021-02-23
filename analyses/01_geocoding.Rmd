@@ -194,7 +194,7 @@ bag_addresses_street %>%
 ```
 
 
-```{r"}
+```{r}
 results_geoadmin_clean <- results_geoadmin %>% 
   filter(!link %in% problems) %>% 
   group_by(link) %>% 
@@ -222,7 +222,7 @@ fail_geoadmin <- bag_addresses_street %>%
   anti_join(select(results_geoadmin_clean, link))
 ```
 
-`r number(nrow(fail_geoadmin), big.mark = ",")` addresses failed to be geocoded despite having addres and will be attempted with next method. 
+`r number(nrow(fail_geoadmin), big.mark = ",")` addresses failed to be geocoded despite having address and will be attempted with next method. 
 
 # Google
 
@@ -483,7 +483,7 @@ Source of address:
 sjmisc::frq(bag_addresses_clean, source)
 ```
 
-```{r}
+```{r map, layout="l-page"}
 bag_addresses_clean_geo <- bag_addresses_clean %>% 
   select(-address_geocoder) %>% 
     st_as_sf(coords = c("geoy", "geox"), remove = TRUE,
