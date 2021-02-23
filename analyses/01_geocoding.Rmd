@@ -1,0 +1,212 @@
+---
+title: "COVID-SEP project"
+subtitle: "Geocoding COVID data"
+description: |
+  Testing providers with mock data.
+date: "`r Sys.Date()`"
+author:
+  - name: Radoslaw Panczak 
+    url: https://github.com/RPanczak
+    affiliation: ISPM
+    affiliation_url: https://www.ispm.unibe.ch/
+    orcid_id: 0000-0001-5141-683X
+# bibliography: biblio.bib
+output:
+  distill::distill_article:
+    highlight: pygments
+    toc: true
+    toc_depth: 1
+    keep_md: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, 
+                      fig.width=9, fig.height=7, dpi=300, out.width="900px", out.height="700px")
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+
+options(scipen=999)
+set.seed(12345)
+
+library(pacman) 
+p_load(tidyverse, readxl, janitor, magrittr, 
+       kableExtra, scales,
+       sf, tmap, tmaptools)
+
+tmap_mode("view") # makes map interactive
+```
+
+# Addresses 
+
+```{r message=FALSE}
+bag_addresses <- read_xlsx("data-raw/BAG-open/2018_Flat_File_de.xlsx", skip = 1) %>% 
+  remove_empty() %>% 
+  clean_names() %>% 
+  filter(!is.na(kanton)) %>%
+  rowid_to_column("link") %>% 
+  relocate(link)
+
+write_rds(bag_addresses, "data/BAG-open/2018_Flat_File_de.Rds")
+```
+
+Raw file consists of dataset of `r number(length(bag_addresses$link), big.mark = ",")` institutions.  
+
+Few example addresses, illustrating one case with no street address given.
+
+```{r}
+bag_addresses %>% 
+  select(institution:kanton) %>% 
+  slice(15:19) %>% 
+  kbl() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>% 
+  column_spec(1, italic = TRUE) %>%
+  row_spec(1, italic = FALSE)
+```
+
+# GeoAdmin 
+
+## Info
+
+Working with search service of [GeoAdmin API](http://api3.geo.admin.ch/services/sdiservices.html?highlight=geocode#search). 
+It doesn't require API sign up. It does however require 'fair use'. [Comment](https://groups.google.com/g/geoadmin-api/c/T9uHlYD28Hc) from swisstopo staff defined it as staying below 2000 req/hour.
+
+<aside>
+Pausing for 2s after each query should do the job in case of working with large dataset.
+</aside>
+
+## Addresses with street names
+
+```{r}
+bag_addresses_street <- bag_addresses %>% 
+  select(link:ort) %>% 
+  filter(!is.na(strasse)) %>% 
+  mutate(address_orig = paste(strasse, ort, sep = ", "))
+
+# length(bag_addresses$link)
+# length(bag_addresses_street$link)
+```
+
+Using `r number(length(bag_addresses_street$link), big.mark = ",")` addresses that have some information on the name of the street. 
+
+
+```{r geoadmin-proc, eval=FALSE, include=FALSE}
+p_load(RCurl, jsonlite)
+
+for (i in seq_along(bag_addresses_street$link)) {
+  
+  u <- paste0("https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText=", 
+              URLencode(bag_addresses_street$address_orig[i]), 
+              "&type=locations")
+  print(u)
+  
+  d <- getURL(u)
+  
+  print(d)
+  
+  j <- jsonlite::fromJSON(d, flatten = TRUE) 
+  
+  if (length(j$results) > 0) {
+    
+    j <- as.data.frame(j)
+    
+    names(j) <- gsub(pattern = "results.", replacement = "", x = names(j))
+    
+    j$link <- bag_addresses_street$link[i]
+    
+    if(i == bag_addresses_street$link[1]) {
+      
+      results_geoadmin <- j
+      
+    } else {
+      
+      results_geoadmin <- bind_rows(results_geoadmin, j)
+      
+    }
+  }
+  
+  Sys.sleep(2)
+}
+
+results_geoadmin %<>% 
+  as_tibble() %>% 
+  clean_names() %>% 
+  group_by(link) %>% 
+  mutate(group_order = row_number(),
+         group_n = n()) %>% 
+  ungroup() %>% 
+  relocate(link, fuzzy, group_order, group_n)
+
+write_rds(results_geoadmin, "data/geocoding/results_geoadmin.Rds")
+```
+
+## Results
+
+```{r}
+results_geoadmin <- read_rds("data/geocoding/results_geoadmin.Rds")
+```
+
+`r number(length(unique(results_geoadmin$link)), big.mark = ",")` addresses have been geocoded. Unfortunately the dataset consists of  `r number(length(results_geoadmin$link), big.mark = ",")` records since some of the adrresses have multiple entries. 
+
+`r number(nrow(filter(results_geoadmin, group_n == 1)), big.mark = ",")` addresses have clean, one geocode. 
+
+`r number(nrow(filter(results_geoadmin, group_order == 1 & group_n > 1)), big.mark = ",")` addresses have between 2 or more hits. Mostly these are listing various addresses on same street locations
+
+```{r}
+results_geoadmin %>% 
+  filter(link == 5) %>% 
+  select(link, attrs_label)
+```
+
+In such cases first address (with bigger geocoding 'weight') is preserved. 
+
+In extreme cases, where address is imprecise, up to 50 (*sic!*) geocodes can be returned, for instance in case of:
+
+```{r}
+bag_addresses_street %>% 
+  select(-address_orig) %>% 
+  filter(link == 596) %>% 
+  kbl() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>% 
+  column_spec(1, italic = TRUE) %>%
+  row_spec(1, italic = FALSE)
+```
+
+These addresses will be geocoded again with alternative method.
+
+```{r}
+problems <- c(77, 123, 329, 352, 596, 624, 635, 636, 646, 667, 682, 687, 703, 708, 759, 776, 777, 787, 884, 1093, 1120, 1123, 1131, 1132, 1136, 1139, 1144, 1149, 1156, 1168, 1175, 1191, 1193, 1204, 1264)
+
+bag_addresses_street %>% 
+  select(-address_orig) %>% 
+  filter(link %in% problems) %>% 
+  kbl() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>% 
+  column_spec(1, italic = TRUE) %>%
+  row_spec(1, italic = FALSE)
+```
+
+
+```{r"}
+results_geoadmin_clean <- results_geoadmin %>% 
+  filter(!link %in% problems) %>% 
+  group_by(link) %>% 
+  filter(group_order == 1) %>% 
+  select(link, attrs_detail, attrs_y, attrs_x) %>% 
+  rename(address_geocoder = attrs_detail,
+         geoy = attrs_y, geox = attrs_x) %>% 
+  mutate(source = "geoadmin")
+
+rm(bag_addresses_street, results_geoadmin)
+```
+
+Clean dataset at this stage consists of `r number(nrow(results_geoadmin_clean), big.mark = ",")` addresses
+
+
+
+
+
