@@ -43,22 +43,22 @@ tmap_mode("view") # makes map interactive
 # Addresses 
 
 ```{r message=FALSE}
-bag_addresses <- read_xlsx("data-raw/BAG-open/2018_Flat_File_de.xlsx", skip = 1) %>% 
+bag_somed_2018 <- read_xlsx("data-raw/BAG-open/2018_Flat_File_de.xlsx", skip = 1) %>% 
   remove_empty() %>% 
   clean_names() %>% 
   filter(!is.na(kanton)) %>%
   rowid_to_column("link") %>% 
   relocate(link)
 
-write_rds(bag_addresses, "data/BAG-open/2018_Flat_File_de.Rds")
+write_rds(bag_somed_2018, "data/BAG-open/bag_somed_2018.Rds")
 ```
 
-Raw file consists of dataset of `r number(length(bag_addresses$link), big.mark = ",")` institutions.  
+Raw file consists of dataset of `r number(length(bag_somed_2018$link), big.mark = ",")` institutions.  
 
-Few example addresses, illustrating one case with no street address given.
+Few example addresses, illustrating one case with no street address given (`NA`).
 
 ```{r}
-bag_addresses %>% 
+bag_somed_2018 %>% 
   select(institution:kanton) %>% 
   slice(15:19) %>% 
   kbl() %>%
@@ -81,12 +81,12 @@ Pausing for 2s after each query should do the job in case of working with large 
 ## Addresses with street names
 
 ```{r}
-bag_addresses_street <- bag_addresses %>% 
+bag_addresses_street <- bag_somed_2018 %>% 
   select(link:ort) %>% 
   filter(!is.na(strasse)) %>% 
   mutate(address_orig = paste(strasse, ort, sep = ", "))
 
-# length(bag_addresses$link)
+# length(bag_somed_2018$link)
 # length(bag_addresses_street$link)
 ```
 
@@ -158,7 +158,11 @@ results_geoadmin <- read_rds("data/geocoding/results_geoadmin.Rds")
 ```{r}
 results_geoadmin %>% 
   filter(link == 5) %>% 
-  select(link, attrs_label)
+  select(link, attrs_label) %>% 
+  kbl() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>% 
+  column_spec(1, italic = TRUE) %>%
+  row_spec(1, italic = FALSE)
 ```
 
 In such cases first address (with bigger geocoding 'weight') is preserved. 
@@ -200,12 +204,16 @@ results_geoadmin_clean <- results_geoadmin %>%
          geoy = attrs_y, geox = attrs_x) %>% 
   mutate(source = "geoadmin")
 
-rm(bag_addresses_street, results_geoadmin)
+rm(results_geoadmin)
 ```
 
-Clean dataset at this stage consists of `r number(nrow(results_geoadmin_clean), big.mark = ",")` addresses
+Clean dataset at this stage consists of `r number(nrow(results_geoadmin_clean), big.mark = ",")` addresses. 
 
+```{r}
+fail_geoadmin <- bag_addresses_street %>% 
+  anti_join(select(results_geoadmin_clean, link))
+```
 
-
+`r number(nrow(fail_geoadmin), big.mark = ",")` addresses failed to be geocoded despite having addres and will be attempted with next method. 
 
 
