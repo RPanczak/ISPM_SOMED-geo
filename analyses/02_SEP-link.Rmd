@@ -1,0 +1,197 @@
+---
+title: "SOMED-geo project"
+subtitle: "Linking SOMED to Swiss-SEP"
+description: |
+  Spatial linkage to sep1 & sep3 to asses distribution across deciles.
+date: "`r Sys.Date()`"
+author:
+  - name: Radoslaw Panczak 
+    url: https://github.com/RPanczak
+    affiliation: ISPM
+    affiliation_url: https://www.ispm.unibe.ch/
+    orcid_id: 0000-0001-5141-683X
+# bibliography: biblio.bib
+output:
+  distill::distill_article:
+    highlight: pygments
+    toc: true
+    toc_depth: 1
+    keep_md: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+<!-- ------------------------------------------------------------ --> 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, 
+                      fig.width=9, fig.height=7, dpi=300, out.width="900px", out.height="700px")
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+
+options(scipen=999)
+set.seed(12345)
+
+library(pacman) 
+p_load(tidyverse, readxl, janitor, magrittr, 
+       kableExtra, scales, hrbrthemes,
+       sf, nngeo,tmap, tmaptools)
+
+tmap_mode("view") # makes map interactive
+```
+
+# Data
+
+## SOMED 
+
+```{r}
+# bag_addresses_clean <- read_rds("data/geocoding/bag_addresses_clean.Rds")
+bag_addresses_clean_geo <- read_rds("data/geocoding/bag_addresses_clean_geo.Rds")
+```
+
+## Swiss-SEP
+
+```{r}
+sep1 <- read_rds("../SNC_Swiss-SEP1/Stata/textres/FINAL/RDS/ssep_user_geo.Rds") %>% 
+  select(v0_buildid, ssep, ssep_d) %>%
+  mutate(ssep_d = factor(ssep_d)) %>% 
+  st_transform(crs = 2056)
+
+sep3 <- read_rds("../SNC_Swiss-SEP2/FINAL/RDS/ssep3_user_geo.Rds") %>%
+  select(gisid, ssep3, ssep3_d) %>%
+  mutate(ssep3_d = factor(ssep3_d))
+```
+
+Using `r number(nrow(sep1), big.mark = ",")` n'hoods from version 1.0 and `r number(nrow(sep3), big.mark = ",")` n'hoods from version 3.0.
+
+# Link
+
+## SEP1
+
+### Distances 
+
+```{r}
+somed_sep1 <- st_join(bag_addresses_clean_geo, sep1, join = st_nearest_feature)
+
+nearest <- st_nearest_feature(bag_addresses_clean_geo, sep1)
+somed_sep1$dist1 <- st_distance(bag_addresses_clean_geo, sep1[nearest, ], 
+                                by_element = TRUE)
+summary(somed_sep1$dist1)
+
+# sjPlot::plot_frq(as.numeric(somed_sep1$dist1), type = "histogram", show.mean = TRUE)
+
+ggplot(somed_sep1, aes(as.numeric(dist1))) + 
+  geom_histogram(binwidth = 10) + 
+  theme_minimal() +
+  xlab("Distnace to nearest SEP1") + ylab("Number of facilities")
+```
+
+### Furthest point 
+
+Five facilities furthest from residential buildings.
+
+```{r}
+somed_sep1_top <- somed_sep1 %>% 
+  arrange(desc(dist1)) %>% 
+  slice(1:5) %>% 
+  select(link:source)
+
+somed_sep1_top_nn <- st_join(somed_sep1_top, sep1, join = st_nn, k = 5) 
+
+somed_sep1_top_nn_geo <- sep1 %>% 
+  filter(v0_buildid %in% somed_sep1_top_nn$v0_buildid)
+
+tm_shape(somed_sep1_top) +
+  tm_dots(col = "red") +
+  tm_shape(somed_sep1_top_nn_geo) +
+  tm_dots()
+```
+
+### Points in 25 m range 
+
+```{r}
+somed_sep1_mid <- somed_sep1 %>% 
+  mutate(dist1 = as.numeric(dist1)) %>% 
+  filter(dist1 < 25) %>% 
+  select(link:source)
+
+somed_sep1_mid_nn <- st_join(somed_sep1_mid, sep1, join = st_nn, k = 5) 
+
+somed_sep1_mid_nn_geo <- sep1 %>% 
+  filter(v0_buildid %in% somed_sep1_mid_nn$v0_buildid)
+
+tm_shape(somed_sep1_mid) +
+  tm_dots(col = "red") +
+  tm_shape(somed_sep1_mid_nn_geo) +
+  tm_dots()
+```
+
+## SEP3
+
+```{r}
+somed_sep3 <- st_join(bag_addresses_clean_geo, sep3, join = st_nearest_feature)
+
+nearest <- st_nearest_feature(bag_addresses_clean_geo, sep3)
+somed_sep3$dist3 <- st_distance(bag_addresses_clean_geo, sep3[nearest, ], 
+                                by_element = TRUE)
+summary(somed_sep3$dist3)
+
+ggplot(somed_sep3, aes(as.numeric(dist3))) + 
+  geom_histogram(binwidth = 10) + 
+  theme_minimal() +
+  xlab("Distnace to nearest SEP3") + ylab("Number of facilities")
+```
+
+```{r}
+rm(nearest)
+gc()
+```
+
+### Furthest point 
+
+Five facilities furthest from residential buildings.
+
+```{r}
+somed_sep3_top <- somed_sep3 %>% 
+  arrange(desc(dist3)) %>% 
+  slice(1:5) %>% 
+  select(link:source)
+
+somed_sep3_top_nn <- st_join(somed_sep3_top, sep3, join = st_nn, k = 5) 
+
+somed_sep3_top_nn_geo <- sep3 %>% 
+  filter(gisid %in% somed_sep3_top_nn$gisid)
+
+tm_shape(somed_sep3_top) +
+  tm_dots(col = "red") +
+  tm_shape(somed_sep3_top_nn_geo) +
+  tm_dots()
+```
+
+### Points in 25 m range 
+
+```{r}
+somed_sep3_mid <- somed_sep3 %>% 
+  mutate(dist3 = as.numeric(dist3)) %>% 
+  filter(dist3 < 25) %>% 
+  select(link:source)
+
+somed_sep3_mid_nn <- st_join(somed_sep3_mid, sep3, join = st_nn, k = 5) 
+
+somed_sep3_mid_nn_geo <- sep3 %>% 
+  filter(gisid %in% somed_sep3_mid_nn$gisid)
+
+tm_shape(somed_sep3_mid) +
+  tm_dots(col = "red") +
+  tm_shape(somed_sep3_mid_nn_geo) +
+  tm_dots()
+```
+
+
+
+
+
+
+
+
+
