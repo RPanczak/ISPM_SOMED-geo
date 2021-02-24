@@ -45,8 +45,7 @@ tmap_mode("view") # makes map interactive
 ## SOMED 
 
 ```{r}
-# bag_addresses_clean <- read_rds("data/geocoding/bag_addresses_clean.Rds")
-bag_addresses_clean_geo <- read_rds("data/geocoding/bag_addresses_clean_geo.Rds")
+bag_addresses_clean_geo <- read_rds("data/BAG-open/bag_addresses_clean_geo.Rds")
 ```
 
 ## Swiss-SEP
