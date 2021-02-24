@@ -474,7 +474,7 @@ bag_addresses_clean <- bag_somed_2018 %>%
                       results_google_2_clean), 
             by = "link")
 
-write_rds(bag_addresses_clean, "data/geocoding/bag_addresses_clean.Rds")
+write_rds(bag_addresses_clean, "data/BAG-open/bag_addresses_clean.Rds")
 ```
 
 Source of address:
@@ -490,7 +490,7 @@ bag_addresses_clean_geo <- bag_addresses_clean %>%
            crs = 2056, 
            agr = "identity") 
 
-write_rds(bag_addresses_clean_geo, "data/geocoding/bag_addresses_clean_geo.Rds")
+write_rds(bag_addresses_clean_geo, "data/BAG-open/bag_addresses_clean_geo.Rds")
 
 qtm(bag_addresses_clean_geo)
 ```
