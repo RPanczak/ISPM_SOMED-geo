@@ -35,7 +35,7 @@ set.seed(12345)
 library(pacman) 
 p_load(tidyverse, readxl, janitor, magrittr, 
        kableExtra, scales, hrbrthemes,
-       sf, nngeo,tmap, tmaptools)
+       sf, nngeo, tmap, tmaptools, geofacet)
 
 tmap_mode("view") # makes map interactive
 ```
@@ -187,10 +187,43 @@ tm_shape(somed_sep3_mid) +
   tm_dots()
 ```
 
+# Deciles
 
+## SEP1
 
+```{r}
+ggplot(somed_sep1, aes(ssep_d)) + 
+  geom_bar() + 
+  theme_minimal() +
+  xlab("SEP1 decile") + ylab("Number of facilities")
+```
 
+```{r}
+ggplot(somed_sep1, aes(ssep_d)) + 
+  geom_bar() + 
+  theme_bw() +
+  xlab("SEP1 decile") + ylab("Number of facilities") +
+  facet_geo(~ kanton, grid = ch_cantons_grid2) +
+  ggtitle("Facilities across cantons")
+```
 
+## SEP3
+
+```{r}
+ggplot(somed_sep3, aes(ssep3_d)) + 
+  geom_bar() + 
+  theme_minimal() +
+  xlab("SEP3 decile") + ylab("Number of facilities")
+```
+
+```{r}
+ggplot(somed_sep3, aes(ssep3_d)) + 
+  geom_bar() + 
+  theme_bw() +
+  xlab("SEP3 decile") + ylab("Number of facilities") +
+  facet_geo(~ kanton, grid = ch_cantons_grid2) +
+  ggtitle("Facilities across cantons")
+```
 
 
 
