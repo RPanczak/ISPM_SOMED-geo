@@ -27,3 +27,6 @@
 
 # authentication
 secrets/
+
+# results
+data/
