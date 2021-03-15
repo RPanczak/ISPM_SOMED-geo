@@ -513,6 +513,8 @@ bag_addresses_clean <- bag_somed_2018 %>%
             by = "link")
 
 write_rds(bag_addresses_clean, "data/BAG-open/bag_addresses_clean.Rds")
+haven::write_dta(bag_addresses_clean, "data/BAG-open/bag_addresses_clean.dta")
+write_csv(bag_addresses_clean, "data/BAG-open/bag_addresses_clean.csv")
 ```
 
 ```{r eval=FALSE, include=FALSE}
