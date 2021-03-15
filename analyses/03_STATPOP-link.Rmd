@@ -118,7 +118,6 @@ tm_shape(somed_r18_bu_mid) +
   tm_dots()
 ```
 
-
 # Characteristics
 
 ## All included
@@ -129,7 +128,7 @@ sjmisc::frq(somed_r18_bu$r18_gklas)
 summary(somed_r18_bu$r18_nrdwell)
 ```
 
-## ALready defined 
+## Already defined 
 
 Still few buildings with low (even zero!) number of residents on all three possible measures of pop?
 
@@ -161,10 +160,9 @@ summary(select_missing$r18_nrpers_main)
 summary(select_missing$r18_nrpers_perm)
 ```
 
-
 ## Residential 
 
-Shouldnt be here at all? Unless with large dist?
+Shouldn't be here at all? Unless with large `dist`?
 
 ```{r}
 select_done <- somed_r18_bu %>% 
