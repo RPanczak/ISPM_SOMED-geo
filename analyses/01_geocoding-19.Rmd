@@ -1,6 +1,6 @@
 ---
 title: "SOMED-geo project"
-subtitle: "Geocoding SOMED 2018 data"
+subtitle: "Geocoding SOMED 2019 data"
 description: |
   Geocoding BAG data using two providers.
 date: "`r Sys.Date()`"
@@ -40,25 +40,31 @@ p_load(tidyverse, readxl, janitor, magrittr,
 tmap_mode("view") # makes map interactive
 ```
 
+# 2018 data
+
+```{r}
+bag_addresses_clean_geo_2018 <- read_rds("data/BAG-open/bag_addresses_clean_geo.Rds")
+```
+
 # Addresses 
 
 ```{r message=FALSE}
-bag_somed_2018 <- read_xlsx("data-raw/BAG-open/2018_Flat_File_de.xlsx", skip = 1) %>% 
+bag_somed_2019 <- read_xlsx("data-raw/BAG-open/2019_Flat_File_de.xlsx", skip = 1) %>% 
   remove_empty() %>% 
   clean_names() %>% 
   filter(!is.na(kanton)) %>%
   rowid_to_column("link") %>% 
   relocate(link)
 
-write_rds(bag_somed_2018, "data/BAG-open/bag_somed_2018.Rds")
+write_rds(bag_somed_2019, "data/BAG-open/bag_somed_2019.Rds")
 ```
 
-Raw file consists of dataset of `r number(length(bag_somed_2018$link), big.mark = ",")` institutions.  
+Raw file consists of dataset of `r number(length(bag_somed_2019$link), big.mark = ",")` institutions.  
 
 Few example addresses, illustrating one case with no street address given (`NA`).
 
 ```{r}
-bag_somed_2018 %>% 
+bag_somed_2019 %>% 
   select(institution:kanton) %>% 
   slice(15:19) %>% 
   kbl() %>%
@@ -81,12 +87,12 @@ Pausing for 2s after each query should do the job in case of working with large 
 ## Addresses with street names
 
 ```{r}
-bag_addresses_street <- bag_somed_2018 %>% 
+bag_addresses_street <- bag_somed_2019 %>% 
   select(link:ort) %>% 
   filter(!is.na(strasse)) %>% 
   mutate(address_orig = paste(strasse, ort, sep = ", "))
 
-# length(bag_somed_2018$link)
+# length(bag_somed_2019$link)
 # length(bag_addresses_street$link)
 ```
 
@@ -170,7 +176,7 @@ In such cases first address (with bigger geocoding 'weight') is preserved.
 In extreme cases, where address is imprecise, up to 50 (*sic!*) geocodes can be returned, for instance in case of:
 
 ```{r}
-bag_somed_2018 %>% 
+bag_somed_2019 %>% 
   select(link:kanton) %>%
   filter(link == 596) %>% 
   kbl() %>%
@@ -274,7 +280,7 @@ register_google(key = key_google)
 ## Addresses with incomplete info 
 
 ```{r}
-bag_addresses_no_street <- bag_somed_2018 %>% 
+bag_addresses_no_street <- bag_somed_2019 %>% 
   select(link:ort) %>% 
   filter(is.na(strasse) | link %in% problems) %>% 
   mutate(strasse = ifelse(institution == "ALTERS- & PFLEGEHEIM ST. ANTONIUS",
@@ -506,7 +512,7 @@ results_google_clean <- bind_rows(results_google_1_clean,
 # Combined results
 
 ```{r}
-bag_addresses_clean <- bag_somed_2018 %>% 
+bag_addresses_clean <- bag_somed_2019 %>% 
   select(link:kanton) %>% 
   left_join(bind_rows(results_geoadmin_clean, 
                       results_google_clean), 
